@@ -3,6 +3,7 @@ import os
 import time
 import datetime
 from typing import List, Optional
+import logging
 
 from textual.app import App, ComposeResult
 from textual.widgets import (
@@ -107,14 +108,26 @@ def log_action(logs: List[str], message: str):
 class TaskItem(ListItem):
     """A ListItem representing a single task row in the ListView."""
     def __init__(self, task: Task, index: int):
-        self.task = task
-        self.index = index
-        super().__init__(Label(self.render_text()))
+        # Store task data first
+        self._task = task
+        self._index = index
+        # Create the label with initial text
+        self._label = Label(self.render_text())
+        # Call super with the label
+        super().__init__(self._label)
 
     def render_text(self) -> str:
         """Return a text representation of this task, with highlighting if resolved."""
-        marker = "[RESOLVED]" if self.task.resolved else ""
-        return f"{marker} {self.task.title}"
+        marker = "[RESOLVED]" if self._task.resolved else ""
+        return f"{marker} {self._task.title}"
+
+    @property
+    def task(self) -> Task:
+        return self._task
+
+    @property
+    def index(self) -> int:
+        return self._index
 
     def update_content(self):
         """Update the displayed content if the task changes."""
@@ -213,57 +226,56 @@ class TodoApp(App):
     # The main list of tasks
     list_view: Optional[ListView] = None
 
+    def __init__(self):
+        super().__init__()
+        # Set up debug logging to a file
+        logging.basicConfig(filename='debug.log', level=logging.DEBUG)
+        self.logger = logging.getLogger(__name__)
+        self.logger.debug("TodoApp initialized")
+        # Load tasks explicitly
+        self.tasks = load_tasks()
+
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
-        # Left container: the ListView of tasks
-        self.list_view = ListView()
-        self.update_task_list_view()  # fill the initial tasks
+        # Create a container to hold our widgets
+        with Container():
+            # Create the ListView and store it
+            self.list_view = ListView()
+            yield self.list_view
 
-        # The help panel (hidden by default)
-        self.help_panel = HelpPanel()
-        self.help_panel.visible = False
+    async def on_mount(self) -> None:
+        """Called after the app is fully loaded."""
+        # Update the list view
+        await self.update_list_view()
+        # Set focus
+        self.list_view.focus()
+        # Save initial state
+        save_tasks(self.tasks)
+        save_logs(self.logs)
 
-        # The log panel
-        self.log_panel = RichLog(highlight=False)
-        self.log_panel.visible = False
-        self.log_panel.write("=== Action Log ===\n")
-        for entry in self.logs:
-            self.log_panel.write(f"{entry}\n")
-
-        # We'll place help panel and log panel on top of the list
-        # with a Vertical container
-        main_container = Vertical(self.list_view, self.help_panel, self.log_panel)
-        yield main_container
-
-    def update_task_list_view(self):
-        """Refresh the items shown in the ListView based on self.tasks."""
-        if not self.list_view:
+    async def update_list_view(self) -> None:
+        """Update the list view with current tasks."""
+        if self.list_view is None:
             return
 
         self.list_view.clear()
-
-        # Sort tasks so that unresolved are at the top, resolved at the bottom
-        # Within each group, user can reorder manually by pressing shift+J/K
-        # (we'll just keep the array order, and rely on user reordering commands)
-        # But automatically, we can group resolved tasks to the bottom:
-        sorted_tasks = sorted(self.tasks, key=lambda t: t.resolved)
-
-        # We'll rebuild self.tasks with that sorted result
-        self.tasks = sorted_tasks
-
+        
         for index, task in enumerate(self.tasks):
             item = TaskItem(task, index)
             self.list_view.append(item)
 
+        self.list_view.refresh()
+        self.list_view.focus()
+
     def action_show_help(self):
         """Toggle help panel (h)."""
         if self.help_panel:
-            self.help_panel.visible = not self.help_panel.visible
+            self.help_panel.display = not self.help_panel.display
 
     def action_toggle_log(self):
         """Toggle the log panel (L)."""
         if self.log_panel:
-            self.log_panel.visible = not self.log_panel.visible
+            self.log_panel.display = not self.log_panel.display
 
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         """Fired when user moves selection up/down in the list. We can handle UI changes if needed."""
@@ -288,13 +300,13 @@ class TodoApp(App):
         key = event.key
 
         if key in ("j", "down"):
-            # Move selection down
-            await self.list_view.action_cursor_down()
+            if self.list_view:
+                await self.list_view.action_cursor_down()
             return
 
         if key in ("k", "up"):
-            # Move selection up
-            await self.list_view.action_cursor_up()
+            if self.list_view:
+                await self.list_view.action_cursor_up()
             return
 
         # Shift + J => reorder selected task one place DOWN in the internal list
@@ -385,7 +397,7 @@ class TodoApp(App):
         self.add_task_panel.styles.border = ("ascii", "green")
         self.add_task_panel.styles.background = "black"
         self.add_task_panel.styles.padding = (1, 1)
-        self.add_task_panel.visible = True
+        self.add_task_panel.display = True
         await self.mount(self.add_task_panel)
         self.add_task_panel.title_input.focus()
 
@@ -437,8 +449,6 @@ class TodoApp(App):
                     # Title is required
                     return
 
-                # If user typed multiple paragraphs separated by "\n",
-                # we can store them in one string with newlines:
                 paragraphs = description.split("\\n")
                 full_desc = "\n".join(paragraphs)
 
@@ -447,25 +457,22 @@ class TodoApp(App):
                 above = self.add_task_panel.above
 
                 if selected_idx == -1:
-                    # If no selection, just append
                     self.tasks.append(new_task)
                 else:
-                    insert_pos = (
-                        selected_idx if above else selected_idx + 1
-                    )
+                    insert_pos = selected_idx if above else selected_idx + 1
                     self.tasks.insert(insert_pos, new_task)
 
                 save_tasks(self.tasks)
                 self.update_task_list_view()
                 self.add_log_entry(f"Created task: '{new_task.title}'")
 
-                self.remove(self.add_task_panel)
+                await self.add_task_panel.remove()
                 self.add_task_panel = None
             return
 
         if event.button.name == "cancel_add":
             if self.add_task_panel:
-                self.remove(self.add_task_panel)
+                await self.add_task_panel.remove()
                 self.add_task_panel = None
             return
 
@@ -497,10 +504,6 @@ class TodoApp(App):
     ############################################################################
     # Lifecycle Events
     ############################################################################
-    def on_mount(self) -> None:
-        """Called after the app is fully loaded; we can set initial focus if needed."""
-        self.list_view.focus()
-
     def on_unmount(self) -> None:
         """Called before the app closes; ensure tasks and logs are saved."""
         save_tasks(self.tasks)
