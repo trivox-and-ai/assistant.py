@@ -142,14 +142,20 @@ class AddTaskPanel(Static):
         self.above = above
         self.title_input = Input(placeholder="Title (required)")
         self.desc_input = Input(placeholder="Description (optional) -- separate multiple paragraphs with '\\n'")
-        self.add_button = Button(label="Add", name="add_task")
-        self.cancel_button = Button(label="Cancel", name="cancel_add")
 
     def compose(self) -> ComposeResult:
-        yield Label("Add New Task")
+        yield Label("Add New Task (Enter to add, Esc to cancel)")
         yield self.title_input
         yield self.desc_input
-        yield Horizontal(self.add_button, self.cancel_button)
+
+    def on_key(self, event: events.Key) -> None:
+        """Handle key events in the add task panel."""
+        if event.key == "enter":
+            # Simulate the old add_task button press
+            self.app.post_message(Button.Pressed(Button(name="add_task")))
+        elif event.key == "escape":
+            # Simulate the old cancel_add button press
+            self.app.post_message(Button.Pressed(Button(name="cancel_add")))
 
 
 class EditTaskPanel(Static):
