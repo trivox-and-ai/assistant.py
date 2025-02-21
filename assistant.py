@@ -380,7 +380,7 @@ class TodoApp(App):
 
         # 'q' => quit
         if key == "q":
-            await self.shutdown()
+            self.exit()  # Removed await - exit() is not an async method
             return
 
     ############################################################################
