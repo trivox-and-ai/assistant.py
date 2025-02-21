@@ -311,7 +311,9 @@ class TodoApp(App):
         if key == "j":  # Only handle 'j', let ListView handle 'down' naturally
             if self.list_view is not None:
                 try:
-                    await self.list_view.action_cursor_down()
+                    result = self.list_view.action_cursor_down()
+                    if result is not None:  # Only await if there's something to await
+                        await result
                 except Exception as e:
                     self.logger.debug(f"Error moving cursor down: {e}")
             return
@@ -319,7 +321,9 @@ class TodoApp(App):
         if key == "k":  # Only handle 'k', let ListView handle 'up' naturally
             if self.list_view is not None:
                 try:
-                    await self.list_view.action_cursor_up()
+                    result = self.list_view.action_cursor_up()
+                    if result is not None:  # Only await if there's something to await
+                        await result
                 except Exception as e:
                     self.logger.debug(f"Error moving cursor up: {e}")
             return
