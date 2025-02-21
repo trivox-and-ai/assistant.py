@@ -255,6 +255,41 @@ class AddTaskScreen(Screen):
     async def on_screen_resume(self) -> None:
         self.title_input.focus()
 
+class EditTaskScreen(Screen):
+    """A full screen mode for editing an existing task."""
+    
+    def __init__(self, task: Task, focus_on_desc=False):
+        super().__init__()
+        self.task = task
+        self.focus_on_desc = focus_on_desc
+        self.title_input = Input(value=task.title)
+        self.desc_input = Input(value=task.description)
+
+    def compose(self) -> ComposeResult:
+        yield Label("Edit Task")
+        yield Label("Title:")
+        yield self.title_input
+        yield Label("Description (use '\\n' for multiline):")
+        yield self.desc_input
+        yield Button(label="Save", name="save_edit")
+        yield Button(label="Cancel", name="cancel_edit")
+
+    async def action_save(self):
+        """Handle saving the task."""
+        # Logic to save the task
+        pass
+
+    async def action_cancel(self):
+        """Handle canceling the edit."""
+        await self.app.pop_screen()
+
+    async def on_mount(self):
+        """Set focus on the appropriate input field."""
+        if self.focus_on_desc:
+            self.desc_input.focus()
+        else:
+            self.title_input.focus()
+
 class TodoApp(App):
     """Main TUI Application."""
 
@@ -476,11 +511,24 @@ class TodoApp(App):
     async def delete_selected_task(self):
         idx = self.get_selected_index()
         if idx == -1:
-            return
+            return  # No task selected
+
         task = self.tasks[idx]
-        self.tasks.pop(idx)
-        save_tasks(self.tasks)
+        self.tasks.pop(idx)  # Remove the selected task
+        save_tasks(self.tasks)  # Save the updated task list
+
+        # Update the list view
         await self.update_list_view()
+
+        # Determine the new index to select
+        if len(self.tasks) > 0:
+            # If there are tasks left, select the next one
+            new_index = min(idx, len(self.tasks) - 1)  # Select the next task or the last one
+            self.post_message(self.MoveCursor(new_index))  # Send a message to move the cursor
+        else:
+            # If no tasks are left, clear the selection
+            self.list_view.index = None
+
         self.add_log_entry(f"Deleted task: '{task.title}'")
 
     async def resolve_or_unresolve_task(self):
@@ -496,16 +544,13 @@ class TodoApp(App):
     async def edit_selected_task(self, focus_on_desc=False):
         idx = self.get_selected_index()
         if idx == -1:
-            return
-        task = self.tasks[idx]
-        if self.edit_task_panel:
-            self.remove(self.edit_task_panel)
+            return  # No task selected
 
-        self.edit_task_panel = EditTaskPanel(task, focus_on_desc=focus_on_desc)
-        self.edit_task_panel.styles.border = ("ascii", "yellow")
-        self.edit_task_panel.styles.background = "black"
-        self.edit_task_panel.styles.padding = (1, 1)
-        self.mount(self.edit_task_panel)
+        task = self.tasks[idx]
+        
+        # Create a new EditTaskScreen instance
+        edit_screen = EditTaskScreen(task, focus_on_desc=focus_on_desc)
+        await self.push_screen(edit_screen)  # Push the new screen
 
     ############################################################################
     # Event Handlers for Add/Edit Panels
