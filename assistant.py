@@ -489,14 +489,14 @@ class TodoApp(App):
                 new_task = Task(title=title, description=full_desc)
                 above = self.add_task_panel.above
 
+                insert_pos = selected_idx if above else selected_idx + 1
                 if selected_idx == -1:
-                    self.tasks.append(new_task)
-                else:
-                    insert_pos = selected_idx if above else selected_idx + 1
-                    self.tasks.insert(insert_pos, new_task)
+                    insert_pos = len(self.tasks)  # Append to end if no selection
 
+                self.tasks.insert(insert_pos, new_task)
                 save_tasks(self.tasks)
                 await self.update_list_view()
+                self.post_message(self.MoveCursor(insert_pos))  # Set selection to new task
                 self.add_log_entry(f"Created task: '{new_task.title}'")
 
                 await self.add_task_panel.remove()
