@@ -7,6 +7,7 @@ import logging
 import asyncio
 
 from textual.app import App, ComposeResult
+from textual.screen import Screen
 from textual.widgets import (
     Static,
     Input,
@@ -135,34 +136,11 @@ class TaskItem(ListItem):
         self._label.update(self.render_text())
 
 
-class AddTaskPanel(Static):
-    """A panel that appears when user presses 'a' or 'A' to add a new task."""
-    def __init__(self, above=True):
-        super().__init__()
-        self.above = above
-        self.title_input = Input(placeholder="Title (required)")
-        self.desc_input = Input(placeholder="Description (optional) -- separate multiple paragraphs with '\\n'")
-
-    def compose(self) -> ComposeResult:
-        yield Label("Add New Task (Enter to add, Esc to cancel)")
-        yield self.title_input
-        yield self.desc_input
-
-    def on_key(self, event: events.Key) -> None:
-        """Handle key events in the add task panel."""
-        if event.key == "enter":
-            # Simulate the old add_task button press
-            self.app.post_message(Button.Pressed(Button(name="add_task")))
-        elif event.key == "escape":
-            # Simulate the old cancel_add button press
-            self.app.post_message(Button.Pressed(Button(name="cancel_add")))
-
-
 class EditTaskPanel(Static):
     """A panel for editing an existing task (title/description)."""
     def __init__(self, task: Task, focus_on_desc=False):
         super().__init__()
-        self.task = task
+        self._task = task
         # We'll keep the old values if user cancels
         self.old_title = task.title
         self.old_description = task.description
@@ -215,6 +193,68 @@ class HelpPanel(Static):
 # Main App
 ###############################################################################
 
+class AddTaskScreen(Screen):
+    """A full screen mode for adding new tasks."""
+    
+    BINDINGS = [
+        ("enter", "submit", "Submit task"),
+        ("escape", "cancel", "Cancel"),
+    ]
+
+    def __init__(self, above=True):
+        super().__init__()
+        self.logger = logging.getLogger(__name__)
+        self.above = above
+        self.title_input = Input(placeholder="Title (required)")
+        self.desc_input = Input(placeholder="Description (optional) -- separate multiple paragraphs with '\\n'")
+
+    def compose(self) -> ComposeResult:
+        yield Label("Add New Task (Enter to add, Esc to cancel)")
+        yield self.title_input
+        yield self.desc_input
+
+    async def on_input_submitted(self, event: Input.Submitted) -> None:
+        await self.action_submit()
+
+    async def action_submit(self) -> None:
+        """Handle Enter key."""
+        title = self.title_input.value.strip()
+        description = self.desc_input.value.strip()
+
+        if not title:
+            return  # Title is required
+
+        paragraphs = description.split("\\n")
+        full_desc = "\n".join(paragraphs)
+        above = self.above
+
+        try:
+            selected_idx = self.app.get_selected_index()
+            new_task = Task(title=title, description=full_desc)
+            
+            insert_pos = selected_idx if above else selected_idx + 1
+            if selected_idx == -1:
+                insert_pos = len(self.app.tasks)  # Append to end if no selection
+
+            self.app.tasks.insert(insert_pos, new_task)
+            save_tasks(self.app.tasks)
+            await self.app.update_list_view()
+            self.app.post_message(TodoApp.MoveCursor(insert_pos))
+            self.app.add_log_entry(f"Created task: '{new_task.title}'")
+        except Exception as e:
+            self.logger.error(f"Error adding task: {e}")
+        finally:
+            self.app.pop_screen()
+
+    async def action_cancel(self) -> None:
+        self.app.pop_screen()
+
+    def on_mount(self):
+        self.title_input.focus()
+
+    async def on_screen_resume(self) -> None:
+        self.title_input.focus()
+
 class TodoApp(App):
     """Main TUI Application."""
 
@@ -224,8 +264,10 @@ class TodoApp(App):
     tasks = reactive(load_tasks())
     logs = reactive(load_logs())
 
+    # Register screens
+    SCREENS = {"add_task": AddTaskScreen}  # Register the screen
+
     # Panels
-    add_task_panel: Optional[AddTaskPanel] = None
     edit_task_panel: Optional[EditTaskPanel] = None
     help_panel: Optional[HelpPanel] = None
     log_panel: Optional[RichLog] = None
@@ -319,20 +361,20 @@ class TodoApp(App):
             if self.list_view is not None:
                 try:
                     result = self.list_view.action_cursor_down()
-                    if result is not None:  # Only await if there's something to await
+                    if result is not None:
                         await result
                 except Exception as e:
-                    self.logger.debug(f"Error moving cursor down: {e}")
+                    self.logger.error(f"Error moving cursor down: {e}")
             return
 
         if key == "k":  # Only handle 'k', let ListView handle 'up' naturally
             if self.list_view is not None:
                 try:
                     result = self.list_view.action_cursor_up()
-                    if result is not None:  # Only await if there's something to await
+                    if result is not None:
                         await result
                 except Exception as e:
-                    self.logger.debug(f"Error moving cursor up: {e}")
+                    self.logger.error(f"Error moving cursor up: {e}")
             return
 
         # Reorder selected task one place DOWN in the internal list
@@ -345,13 +387,13 @@ class TodoApp(App):
             await self.move_task_up()
             return
 
-        # 'a' => add new task above selected
-        if key == "a":
+        # 'A' => add new task BEFORE selected
+        if key == "A":
             await self.open_add_task_panel(above=True)
             return
 
-        # 'A' => add new task below selected
-        if key == "A":
+        # 'a' => add new task AFTER selected
+        if key == "a":
             await self.open_add_task_panel(above=False)
             return
 
@@ -387,7 +429,7 @@ class TodoApp(App):
 
         # 'q' => quit
         if key == "q":
-            self.exit()  # Removed await - exit() is not an async method
+            self.exit()
             return
 
     ############################################################################
@@ -427,18 +469,9 @@ class TodoApp(App):
         self.list_view.focus()
 
     async def open_add_task_panel(self, above=True):
-        """Open a panel for adding a new task."""
-        # If there's already a panel, remove it
-        if self.add_task_panel:
-            await self.add_task_panel.remove()
-
-        self.add_task_panel = AddTaskPanel(above=above)
-        self.add_task_panel.styles.border = ("ascii", "green")
-        self.add_task_panel.styles.background = "black"
-        self.add_task_panel.styles.padding = (1, 1)
-        self.add_task_panel.display = True
-        await self.mount(self.add_task_panel)
-        self.add_task_panel.title_input.focus()
+        """Switch to add task screen."""
+        screen = AddTaskScreen(above=above)
+        await self.push_screen(screen)
 
     async def delete_selected_task(self):
         idx = self.get_selected_index()
@@ -478,43 +511,6 @@ class TodoApp(App):
     # Event Handlers for Add/Edit Panels
     ############################################################################
     async def on_button_pressed(self, event: Button.Pressed):
-        # For add task
-        if event.button.name == "add_task":
-            if self.add_task_panel:
-                title = self.add_task_panel.title_input.value.strip()
-                description = self.add_task_panel.desc_input.value.strip()
-
-                if not title:
-                    # Title is required
-                    return
-
-                paragraphs = description.split("\\n")
-                full_desc = "\n".join(paragraphs)
-
-                selected_idx = self.get_selected_index()
-                new_task = Task(title=title, description=full_desc)
-                above = self.add_task_panel.above
-
-                insert_pos = selected_idx if above else selected_idx + 1
-                if selected_idx == -1:
-                    insert_pos = len(self.tasks)  # Append to end if no selection
-
-                self.tasks.insert(insert_pos, new_task)
-                save_tasks(self.tasks)
-                await self.update_list_view()
-                self.post_message(self.MoveCursor(insert_pos))  # Set selection to new task
-                self.add_log_entry(f"Created task: '{new_task.title}'")
-
-                await self.add_task_panel.remove()
-                self.add_task_panel = None
-            return
-
-        if event.button.name == "cancel_add":
-            if self.add_task_panel:
-                await self.add_task_panel.remove()
-                self.add_task_panel = None
-            return
-
         # For edit task
         if event.button.name == "save_edit":
             if self.edit_task_panel:
