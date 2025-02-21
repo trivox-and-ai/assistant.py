@@ -188,8 +188,8 @@ class HelpPanel(Static):
             "Commands:",
             "  j / ↓ : Move selection down",
             "  k / ↑ : Move selection up",
-            "  J (shift+j): Move selected task DOWN in priority",
-            "  K (shift+k): Move selected task UP in priority",
+            "  J: Move selected task DOWN in priority",
+            "  K: Move selected task UP in priority",
             "  a: Add new task ABOVE selected",
             "  A: Add new task BELOW selected",
             "  d: Delete selected task",
@@ -197,7 +197,7 @@ class HelpPanel(Static):
             "  e: Edit selected task (focus Title first)",
             "  E: Edit selected task (focus Description first)",
             "  h: Toggle this help panel",
-            "  L (shift+l): Toggle action log panel",
+            "  L: Toggle action log panel",
             "  q: Quit",
         ]
         help_text = "\n".join(lines)
@@ -228,8 +228,17 @@ class TodoApp(App):
 
     def __init__(self):
         super().__init__()
+        # Check if --release flag is present
+        import sys
+        mode = 'a' if '--release' in sys.argv else 'w'
+        
         # Set up debug logging to a file
-        logging.basicConfig(filename='debug.log', level=logging.DEBUG)
+        logging.basicConfig(
+            filename='debug.log',
+            filemode=mode,  # 'w' for overwrite, 'a' for append
+            level=logging.DEBUG,
+            format='%(asctime)s - %(levelname)s - %(message)s'
+        )
         self.logger = logging.getLogger(__name__)
         self.logger.debug("TodoApp initialized")
         # Load tasks explicitly
@@ -299,14 +308,20 @@ class TodoApp(App):
     async def on_key(self, event: events.Key) -> None:
         key = event.key
 
-        if key in ("j", "down"):
-            if self.list_view:
-                await self.list_view.action_cursor_down()
+        if key == "j":  # Only handle 'j', let ListView handle 'down' naturally
+            if self.list_view is not None:
+                try:
+                    await self.list_view.action_cursor_down()
+                except Exception as e:
+                    self.logger.debug(f"Error moving cursor down: {e}")
             return
 
-        if key in ("k", "up"):
-            if self.list_view:
-                await self.list_view.action_cursor_up()
+        if key == "k":  # Only handle 'k', let ListView handle 'up' naturally
+            if self.list_view is not None:
+                try:
+                    await self.list_view.action_cursor_up()
+                except Exception as e:
+                    self.logger.debug(f"Error moving cursor up: {e}")
             return
 
         # Shift + J => reorder selected task one place DOWN in the internal list
@@ -374,7 +389,7 @@ class TodoApp(App):
             return  # can't move up
         self.tasks[idx], self.tasks[idx - 1] = self.tasks[idx - 1], self.tasks[idx]
         save_tasks(self.tasks)
-        self.update_task_list_view()
+        await self.update_list_view()
         await self.list_view.set_cursor_position(idx - 1)
 
     async def move_task_down(self):
@@ -384,7 +399,7 @@ class TodoApp(App):
             return  # can't move down
         self.tasks[idx], self.tasks[idx + 1] = self.tasks[idx + 1], self.tasks[idx]
         save_tasks(self.tasks)
-        self.update_task_list_view()
+        await self.update_list_view()
         await self.list_view.set_cursor_position(idx + 1)
 
     async def open_add_task_panel(self, above=True):
@@ -408,7 +423,7 @@ class TodoApp(App):
         task = self.tasks[idx]
         self.tasks.pop(idx)
         save_tasks(self.tasks)
-        self.update_task_list_view()
+        await self.update_list_view()
         self.add_log_entry(f"Deleted task: '{task.title}'")
 
     async def resolve_or_unresolve_task(self):
@@ -419,7 +434,7 @@ class TodoApp(App):
         task.resolved = not task.resolved
         self.add_log_entry(f"{'Resolved' if task.resolved else 'Unresolved'} task: '{task.title}'")
         save_tasks(self.tasks)
-        self.update_task_list_view()
+        await self.update_list_view()
 
     async def edit_selected_task(self, focus_on_desc=False):
         idx = self.get_selected_index()
@@ -463,7 +478,7 @@ class TodoApp(App):
                     self.tasks.insert(insert_pos, new_task)
 
                 save_tasks(self.tasks)
-                self.update_task_list_view()
+                await self.update_list_view()
                 self.add_log_entry(f"Created task: '{new_task.title}'")
 
                 await self.add_task_panel.remove()
@@ -485,7 +500,7 @@ class TodoApp(App):
                 self.edit_task_panel.task.description = "\n".join(paragraphs)
 
                 save_tasks(self.tasks)
-                self.update_task_list_view()
+                await self.update_list_view()
                 self.add_log_entry(f"Edited task: '{self.edit_task_panel.task.title}'")
                 self.remove(self.edit_task_panel)
                 self.edit_task_panel = None
