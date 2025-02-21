@@ -4,6 +4,7 @@ import time
 import datetime
 from typing import List, Optional
 import logging
+import asyncio
 
 from textual.app import App, ComposeResult
 from textual.widgets import (
@@ -328,13 +329,13 @@ class TodoApp(App):
                     self.logger.debug(f"Error moving cursor up: {e}")
             return
 
-        # Shift + J => reorder selected task one place DOWN in the internal list
-        if key == "J":  # Capital J means shift was pressed
+        # Reorder selected task one place DOWN in the internal list
+        if key == "J":
             await self.move_task_down()
             return
 
-        # Shift + K => reorder selected task one place UP
-        if key == "K":  # Capital K means shift was pressed
+        # Reorder selected task one place UP
+        if key == "K":
             await self.move_task_up()
             return
 
@@ -391,20 +392,33 @@ class TodoApp(App):
         idx = self.get_selected_index()
         if idx <= 0:
             return  # can't move up
+        
         self.tasks[idx], self.tasks[idx - 1] = self.tasks[idx - 1], self.tasks[idx]
         save_tasks(self.tasks)
         await self.update_list_view()
-        await self.list_view.set_cursor_position(idx - 1)
+        self.post_message(self.MoveCursor(idx - 1))
 
     async def move_task_down(self):
         """Move selected task down in priority (swap with next in list)."""
         idx = self.get_selected_index()
         if idx == -1 or idx >= len(self.tasks) - 1:
             return  # can't move down
+        
         self.tasks[idx], self.tasks[idx + 1] = self.tasks[idx + 1], self.tasks[idx]
         save_tasks(self.tasks)
         await self.update_list_view()
-        await self.list_view.set_cursor_position(idx + 1)
+        self.post_message(self.MoveCursor(idx + 1))
+
+    class MoveCursor(events.Message):
+        """Message to move cursor to specific position."""
+        def __init__(self, target_index: int) -> None:
+            self.target_index = target_index
+            super().__init__()
+
+    async def on_todo_app_move_cursor(self, message: MoveCursor) -> None:
+        """Handle cursor movement message."""
+        self.list_view.index = message.target_index
+        self.list_view.focus()
 
     async def open_add_task_panel(self, above=True):
         """Open a panel for adding a new task."""
