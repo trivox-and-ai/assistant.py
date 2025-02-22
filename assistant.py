@@ -136,36 +136,6 @@ class TaskItem(ListItem):
         self._label.update(self.render_text())
 
 
-class EditTaskPanel(Static):
-    """A panel for editing an existing task (title/description)."""
-    def __init__(self, task: Task, focus_on_desc=False):
-        super().__init__()
-        self._task = task
-        # We'll keep the old values if user cancels
-        self.old_title = task.title
-        self.old_description = task.description
-
-        self.title_input = Input(value=task.title)
-        self.desc_input = Input(value=task.description)
-        self.save_button = Button(label="Save", name="save_edit")
-        self.cancel_button = Button(label="Cancel", name="cancel_edit")
-        self.focus_on_desc = focus_on_desc
-
-    def on_mount(self):
-        """Called once the panel is added to the DOM. We can set focus here."""
-        if self.focus_on_desc:
-            self.desc_input.focus()
-        else:
-            self.title_input.focus()
-
-    def compose(self) -> ComposeResult:
-        yield Label("Edit Task")
-        yield Label("Title:")
-        yield self.title_input
-        yield Label("Description (use '\\n' for multiline):")
-        yield self.desc_input
-        yield Horizontal(self.save_button, self.cancel_button)
-
 class HelpPanel(Static):
     """Shows the help (available commands)."""
     def compose(self) -> ComposeResult:
@@ -204,8 +174,16 @@ class TaskScreen(Screen):
     def __init__(self, task: Optional[Task] = None):
         super().__init__()
         self._task = task
-        self.title_input = Input(placeholder="Title (required)")
-        self.desc_input = Input(placeholder="Description (optional) -- separate multiple paragraphs with '\\n'")
+        
+        self.title_input = Input(
+            placeholder="Title (required)",
+            select_on_focus=False
+        )
+
+        self.desc_input = Input(
+            placeholder="Description (optional)",
+            select_on_focus=False
+        )
 
         if task:
             self.title_input.value = task.title
@@ -213,6 +191,10 @@ class TaskScreen(Screen):
 
         # Initialize logger
         self.logger = logging.getLogger(__name__)
+
+    def on_mount(self):
+        """Called once the screen is mounted."""
+        self.title_input.focus()
 
     def compose(self) -> ComposeResult:
         yield Label("Task Details")
@@ -273,7 +255,6 @@ class TodoApp(App):
     SCREENS = {"add_task": TaskScreen}  # Register the screen
 
     # Panels
-    edit_task_panel: Optional[EditTaskPanel] = None
     help_panel: Optional[HelpPanel] = None
     log_panel: Optional[RichLog] = None
 
@@ -556,17 +537,6 @@ class TodoApp(App):
         self.add_log_entry(f"{'Resolved' if task.resolved else 'Unresolved'} task: '{task.title}'")
         save_tasks(self.tasks)
         await self.update_list_view()
-
-    async def edit_selected_task(self, focus_on_desc=False):
-        idx = self.get_selected_index()
-        if idx == -1:
-            return  # No task selected
-
-        task = self.tasks[idx]
-        
-        # Create a new EditTaskScreen instance
-        edit_screen = EditTaskScreen(task)
-        await self.push_screen(edit_screen)  # Push the new screen
 
     ############################################################################
     # Event Handlers for Add/Edit Panels
