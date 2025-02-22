@@ -171,9 +171,10 @@ class TaskScreen(Screen):
         ("escape", "cancel", "Cancel"),
     ]
 
-    def __init__(self, task: Optional[Task] = None):
+    def __init__(self, task: Optional[Task] = None, focus_description: bool = False):
         super().__init__()
         self._task = task
+        self._focus_description = focus_description  # Store which field should get focus
         
         self.title_input = Input(
             placeholder="Title (required)",
@@ -194,7 +195,11 @@ class TaskScreen(Screen):
 
     def on_mount(self):
         """Called once the screen is mounted."""
-        self.title_input.focus()
+        # Focus the appropriate input field
+        if self._focus_description:
+            self.desc_input.focus()
+        else:
+            self.title_input.focus()
 
     def compose(self) -> ComposeResult:
         yield Label("Task Details")
@@ -401,7 +406,7 @@ class TodoApp(App):
             selected_index = self.get_selected_index()
             if selected_index is not None:
                 task_to_edit = self.tasks[selected_index]
-                await self.open_task_screen(task=task_to_edit)
+                await self.open_task_screen(task=task_to_edit, focus_description=False)
             return
 
         # 'E' => shift+e => focus description first
@@ -409,7 +414,7 @@ class TodoApp(App):
             selected_index = self.get_selected_index()
             if selected_index is not None:
                 task_to_edit = self.tasks[selected_index]
-                await self.open_task_screen(task=task_to_edit)
+                await self.open_task_screen(task=task_to_edit, focus_description=True)
             return
 
         # 'L' => shift+l => show/hide log
@@ -458,7 +463,7 @@ class TodoApp(App):
         self.list_view.index = message.target_index
         self.list_view.focus()
 
-    async def open_task_screen(self, task: Optional[Task] = None, insert_above: bool = False):
+    async def open_task_screen(self, task: Optional[Task] = None, insert_above: bool = False, focus_description: bool = False):
         """Open the task screen for adding or editing a task."""
         # Store the state
         self._editing_task = task
@@ -467,7 +472,7 @@ class TodoApp(App):
         if task is None:
             selected_index = self.get_selected_index()  # Get the currently selected index
 
-        screen = TaskScreen(task)  # Pass the existing task or None to the screen
+        screen = TaskScreen(task, focus_description=focus_description)  # Pass focus preference to screen
         await self.push_screen(screen)
 
     async def on_task_screen_result(self, message: TaskScreenResult) -> None:
