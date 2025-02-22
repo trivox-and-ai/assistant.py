@@ -247,6 +247,10 @@ class TaskScreenResult(events.Message):
         self.description = description
         super().__init__()
 
+class TaskScreenComplete(events.Message):
+    """Message indicating that task screen processing is complete."""
+    pass
+
 class TodoApp(App):
     """Main TUI Application."""
 
@@ -287,6 +291,7 @@ class TodoApp(App):
         # Add these instance variables for tracking state
         self._editing_task = None  # The task being edited, if any
         self._insert_above = False  # Whether to insert above or below when adding
+        self._handling_task_screen = False  # Add flag to track task screen handling
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
@@ -351,6 +356,11 @@ class TodoApp(App):
     ############################################################################
     async def on_key(self, event: events.Key) -> None:
         """Handle key events for the main application."""
+        # Skip handling if we're processing a task screen result
+        if self._handling_task_screen:
+            return
+
+        # Regular key handling
         if event.key == "A":  # Add task above
             await self.open_task_screen(insert_above=True)
             return
@@ -401,15 +411,15 @@ class TodoApp(App):
             self.action_show_help()
             return
 
-        # 'e' => edit selected task
-        elif event.key == "e":
+        # Multiple commands for editing (focus title first)
+        elif event.key in ("e", "o", "enter"):
             selected_index = self.get_selected_index()
             if selected_index is not None:
                 task_to_edit = self.tasks[selected_index]
                 await self.open_task_screen(task=task_to_edit, focus_description=False)
             return
 
-        # 'E' => shift+e => focus description first
+        # 'E' => edit selected task (focus description)
         elif event.key == "E":
             selected_index = self.get_selected_index()
             if selected_index is not None:
@@ -465,6 +475,8 @@ class TodoApp(App):
 
     async def open_task_screen(self, task: Optional[Task] = None, insert_above: bool = False, focus_description: bool = False):
         """Open the task screen for adding or editing a task."""
+        self._handling_task_screen = True
+
         # Store the state
         self._editing_task = task
         self._insert_above = insert_above
@@ -477,38 +489,47 @@ class TodoApp(App):
 
     async def on_task_screen_result(self, message: TaskScreenResult) -> None:
         """Handle the result from TaskScreen."""
-        if message.cancelled:
-            self._editing_task = None  # Clear the reference
-            return
+        try:
+            if message.cancelled:
+                self._editing_task = None  # Clear the reference
+                return
 
-        selected_index = self.get_selected_index()
-        if self._editing_task:  # If we were editing an existing task
-            self._editing_task.title = message.title
-            self._editing_task.description = message.description
-            task_title = self._editing_task.title
-            target_index = selected_index  # Keep same position for edited task
-            self._editing_task = None  # Clear the reference
-            action = "Edited"
-        else:  # Adding a new task
-            new_task = Task(title=message.title, description=message.description)
-            # Insert at the appropriate position
-            if self._insert_above and selected_index is not None:
-                self.tasks.insert(selected_index, new_task)
-                target_index = selected_index  # Select the new task
-            else:
-                insert_idx = selected_index + 1 if selected_index is not None else len(self.tasks)
-                self.tasks.insert(insert_idx, new_task)
-                target_index = insert_idx  # Select the new task
-            task_title = new_task.title
-            action = "Added"
+            selected_index = self.get_selected_index()
+            if self._editing_task:  # If we were editing an existing task
+                self._editing_task.title = message.title
+                self._editing_task.description = message.description
+                task_title = self._editing_task.title
+                target_index = selected_index  # Keep same position for edited task
+                self._editing_task = None  # Clear the reference
+                action = "Edited"
+            else:  # Adding a new task
+                new_task = Task(title=message.title, description=message.description)
+                # Insert at the appropriate position
+                if self._insert_above and selected_index is not None:
+                    self.tasks.insert(selected_index, new_task)
+                    target_index = selected_index  # Select the new task
+                else:
+                    insert_idx = selected_index + 1 if selected_index is not None else len(self.tasks)
+                    self.tasks.insert(insert_idx, new_task)
+                    target_index = insert_idx  # Select the new task
+                task_title = new_task.title
+                action = "Added"
 
-        # Save changes and update view
-        save_tasks(self.tasks)
-        await self.update_list_view()
-        self.add_log_entry(f"{action} task: '{task_title}'")
-        
-        # Move cursor to target position and ensure focus
-        self.post_message(self.MoveCursor(target_index))
+            # Save changes and update view
+            save_tasks(self.tasks)
+            await self.update_list_view()
+            self.add_log_entry(f"{action} task: '{task_title}'")
+            
+            # Move cursor to target position and ensure focus
+            self.post_message(self.MoveCursor(target_index))
+
+        finally:
+            # Post message to reset the flag after all processing is complete
+            self.post_message(TaskScreenComplete())
+
+    async def on_task_screen_complete(self, message: TaskScreenComplete) -> None:
+        """Handle completion of task screen processing."""
+        self._handling_task_screen = False
 
     async def delete_selected_task(self):
         idx = self.get_selected_index()
