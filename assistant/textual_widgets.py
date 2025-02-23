@@ -8,18 +8,37 @@ from .data_model import Task
 
 class TaskItem(ListItem):
     """A ListItem representing a single task row in the ListView."""
+    
+    DEFAULT_CSS = """
+    TaskItem {
+        color: #00dd00;
+        text-style: bold;
+    }
+    
+    TaskItem > Label {
+        color: #00dd00;
+        text-style: bold;
+    }
+    
+    TaskItem.-resolved,
+    TaskItem.-resolved > Label {
+        color: #666666;
+    }
+    """
+    
     def __init__(self, task: Task, index: int):
-        # Store task data
+        # Create the label with initial text
         self._task = task
         self._index = index
-        # Create the label with initial text
         self._label = Label(self.render_text())
         # Call super with the label
         super().__init__(self._label)
+        if task.resolved:  # Only add class if resolved
+            self.add_class("-resolved")
 
     def render_text(self) -> str:
         """Return a text representation of this task, with a marker if resolved."""
-        marker = "[RESOLVED]" if self._task.resolved else ""
+        marker = "[R]" if self._task.resolved else ""
         return f"{marker} {self._task.title}"
 
     @property
@@ -33,6 +52,10 @@ class TaskItem(ListItem):
     def update_content(self):
         """Update the displayed content if the task changes."""
         self._label.update(self.render_text())
+        if self._task.resolved:
+            self.add_class("-resolved")
+        else:
+            self.remove_class("-resolved")
 
 
 class HelpPanel(Static):

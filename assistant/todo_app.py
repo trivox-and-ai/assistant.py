@@ -24,7 +24,17 @@ from .screens import TaskScreen, TaskScreenResult, TaskScreenComplete
 
 class TodoApp(App):
     """Main TUI Application."""
-    CSS_PATH = None  # Not using a separate CSS file
+    CSS = """
+    Screen {
+        color: #00dd00;
+        text-style: bold;
+    }
+    
+    ListView {
+        width: 100%;
+        height: 100%;
+    }
+    """
 
     # Reactive state
     tasks = reactive(load_tasks())
