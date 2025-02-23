@@ -20,7 +20,8 @@ from .persistence import (
     log_action
 )
 from .textual_widgets import TaskItem, HelpPanel
-from .screens import TaskScreen, TaskScreenResult, TaskScreenComplete
+from .task_screen import TaskScreen, TaskScreenResult, TaskScreenComplete
+from .review_screen import ReviewScreen
 
 class TodoApp(App):
     """Main TUI Application."""
@@ -41,7 +42,10 @@ class TodoApp(App):
     logs = reactive(load_logs())
 
     # Screens
-    SCREENS = {"add_task": TaskScreen}
+    SCREENS = {
+        "add_task": TaskScreen,
+        "review": ReviewScreen
+    }
 
     help_panel: Optional[HelpPanel] = None
     log_panel: Optional[RichLog] = None
@@ -171,6 +175,9 @@ class TodoApp(App):
             return
         elif event.key == "q":
             self.exit()
+            return
+        elif event.key == "R":
+            await self.push_screen("review")
             return
 
     async def move_task_up(self):
