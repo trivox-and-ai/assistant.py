@@ -25,8 +25,6 @@ class ReviewScreen(Screen):
     
     BINDINGS = [
         ("escape", "cancel", "Exit review mode"),
-        ("space", "toggle_reopen", "Mark for reopening"),
-        ("d", "toggle_delete", "Mark for deletion"),
     ]
 
     def __init__(self, tasks: List[Task]):
@@ -58,7 +56,7 @@ class ReviewScreen(Screen):
 
     async def on_key(self, event: events.Key) -> None:
         """Handle key events for the review screen."""
-        # Capture all key events to prevent them from reaching the main app
+        
         if event.key in ("j"):
             if self.list_view:
                 self.list_view.index = (
@@ -67,7 +65,6 @@ class ReviewScreen(Screen):
                     else 0
                 )
                 self.list_view.focus()
-            return True
         elif event.key in ("k"):
             if self.list_view:
                 self.list_view.index = (
@@ -76,16 +73,12 @@ class ReviewScreen(Screen):
                     else 0
                 )
                 self.list_view.focus()
-            return True
         elif event.key == "escape":
             self.action_cancel()
-            return True
         elif event.key == "space":
             self.action_toggle_reopen()
-            return True
         elif event.key == "d":
             self.action_toggle_delete()
-            return True
         return True  # Capture all other keys to prevent them from reaching the main app
 
     def _refresh_list(self):
@@ -98,9 +91,24 @@ class ReviewScreen(Screen):
         
         if current_index is not None:
             self.post_message(self.MoveCursor(current_index))
+
+    def _update_item(self, index: int) -> None:
+        """Update single item in the list view."""
+        if index is None or index >= len(self.tasks):
+            return
+            
+        task = self.tasks[index]
+        decision = self.decisions[task]
         
-        # Ensure focus is maintained after refresh
-        self.list_view.focus()
+        # Create new item with updated state
+        new_item = ReviewTaskItem(task, index, decision)
+        
+        # Replace only the specific item
+        self.list_view.children[index].remove()  # Remove the old item
+        self.list_view.mount(new_item, before=index)  # Insert the new item at the right position
+        
+        # Also post message to ensure consistent state
+        self.post_message(self.MoveCursor(index))
 
     def action_toggle_reopen(self) -> None:
         """Toggle reopen state for the selected task."""
@@ -113,7 +121,7 @@ class ReviewScreen(Screen):
             ReviewDecision.KEEP if current == ReviewDecision.REOPEN 
             else ReviewDecision.REOPEN
         )
-        self._refresh_list()
+        self._update_item(current_index)  # Update only this item
 
     def action_toggle_delete(self) -> None:
         """Toggle delete state for the selected task."""
@@ -126,7 +134,7 @@ class ReviewScreen(Screen):
             ReviewDecision.KEEP if current == ReviewDecision.DELETE 
             else ReviewDecision.DELETE
         )
-        self._refresh_list()
+        self._update_item(current_index)  # Update only this item
 
     def action_cancel(self) -> None:
         """Handle Escape key to exit review mode."""
