@@ -102,7 +102,8 @@ class ReviewTaskItem(ListItem):
     """
     
     def __init__(self, task: Task, index: int, decision: 'ReviewDecision'):
-        self._task = task
+        # Initialize task and decision before calling super()
+        self._task_item = task  # Changed from _task to _task_item to avoid conflict
         self._index = index
         self._decision = decision
         self._label = Label(self.render_text())
@@ -122,12 +123,28 @@ class ReviewTaskItem(ListItem):
             "delete": "[D]"
         }
         marker = markers[self._decision.value]
-        return f"{marker} {self._task.title}"
+        return f"{marker} {self._task_item.title}"  # Changed from _task to _task_item
 
     @property
     def task(self) -> Task:
-        return self._task
+        return self._task_item  # Changed from _task to _task_item
 
     @property
     def index(self) -> int:
         return self._index
+
+    def update_decision(self, decision: 'ReviewDecision') -> None:
+        """Update the item's decision state and appearance."""
+        self._decision = decision
+        
+        # Update the label text
+        self._label.update(self.render_text())
+        
+        # Update CSS classes
+        self.remove_class("-reopen")
+        self.remove_class("-delete")
+        
+        if decision.value == "reopen":
+            self.add_class("-reopen")
+        elif decision.value == "delete":
+            self.add_class("-delete")

@@ -100,12 +100,10 @@ class ReviewScreen(Screen):
         task = self.tasks[index]
         decision = self.decisions[task]
         
-        # Create new item with updated state
-        new_item = ReviewTaskItem(task, index, decision)
-        
-        # Replace only the specific item
-        self.list_view.children[index].remove()  # Remove the old item
-        self.list_view.mount(new_item, before=index)  # Insert the new item at the right position
+        # Get existing item and update it in place
+        existing_item = self.list_view.children[index]
+        if isinstance(existing_item, ReviewTaskItem):
+            existing_item.update_decision(decision)
         
         # Also post message to ensure consistent state
         self.post_message(self.MoveCursor(index))
