@@ -263,13 +263,36 @@ class TodoApp(App):
         idx = self.get_selected_index()
         if idx == -1:
             return
+            
         task = self.tasks[idx]
         task.resolved = not task.resolved
+        
+        if task.resolved:
+            # Remove task from current position
+            self.tasks.pop(idx)
+            # Add it to the end
+            self.tasks.append(task)
+            
+            # Calculate new cursor position
+            # If we're at the last item, move cursor up
+            new_index = min(idx, len(self.tasks) - 2) if len(self.tasks) > 1 else 0
+        else:
+            # Remove task from current position
+            self.tasks.pop(idx)
+            # Add it to the beginning
+            self.tasks.insert(0, task)
+            # Focus on the unresolved task at the top
+            new_index = 0
+            
         self.add_log_entry(
             f"{'Resolved' if task.resolved else 'Unresolved'} task: '{task.title}'"
         )
+        
         save_tasks(self.tasks)
         await self.update_list_view()
+        
+        # Move cursor via message
+        self.post_message(self.MoveCursor(new_index))
 
     def on_unmount(self) -> None:
         """Called before the app closes; ensure tasks/logs are saved."""
