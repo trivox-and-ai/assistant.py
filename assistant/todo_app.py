@@ -44,7 +44,6 @@ class TodoApp(App):
     # Screens
     SCREENS = {
         "add_task": TaskScreen,
-        "review": ReviewScreen
     }
 
     help_panel: Optional[HelpPanel] = None
@@ -177,7 +176,8 @@ class TodoApp(App):
             self.exit()
             return
         elif event.key == "R":
-            await self.push_screen("review")
+            screen = ReviewScreen(self.tasks)
+            await self.push_screen(screen)
             return
 
     async def move_task_up(self):

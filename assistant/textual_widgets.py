@@ -79,3 +79,32 @@ class HelpPanel(Static):
         ]
         help_text = "\n".join(lines)
         yield Label(help_text)
+
+
+class ReviewTaskItem(ListItem):
+    """A ListItem representing a task in review mode."""
+    
+    DEFAULT_CSS = """
+    ReviewTaskItem {
+        color: #00dd00;
+        text-style: bold;
+    }
+    """
+    
+    def __init__(self, task: Task, index: int):
+        self._task = task
+        self._index = index
+        self._label = Label(self.render_text())
+        super().__init__(self._label)
+
+    def render_text(self) -> str:
+        """Return a text representation of this task."""
+        return f"[R] {self._task.title}"
+
+    @property
+    def task(self) -> Task:
+        return self._task
+
+    @property
+    def index(self) -> int:
+        return self._index
