@@ -69,6 +69,7 @@ class TodoApp(App):
         self._editing_task = None
         self._insert_above = False
         self._handling_task_screen = False
+        self._handling_review_screen = False
 
     def compose(self) -> ComposeResult:
         with Container():
@@ -125,7 +126,7 @@ class TodoApp(App):
 
     async def on_key(self, event: events.Key) -> None:
         """Handle key events for the main application."""
-        if self._handling_task_screen:
+        if self._handling_task_screen or self._handling_review_screen:
             return
 
         if event.key == "A":  # Add task ABOVE
@@ -136,11 +137,11 @@ class TodoApp(App):
             return
         elif event.key == "j":
             if self.list_view is not None:
-                await self.list_view.action_cursor_down()
+                self.list_view.action_cursor_down()
             return
         elif event.key == "k":
             if self.list_view is not None:
-                await self.list_view.action_cursor_up()
+                self.list_view.action_cursor_up()
             return
         elif event.key == "J":
             await self.move_task_down()
@@ -321,3 +322,20 @@ class TodoApp(App):
         save_tasks(self.tasks)
         save_logs(self.logs)
         await self.shutdown()
+
+    async def push_screen(self, screen: Screen, *args, **kwargs) -> None:
+        """Override push_screen to track which screen we're handling."""
+        if isinstance(screen, TaskScreen):
+            self._handling_task_screen = True
+        elif isinstance(screen, ReviewScreen):
+            self._handling_review_screen = True
+        await super().push_screen(screen, *args, **kwargs)
+
+    def pop_screen(self) -> None:
+        """Override pop_screen to reset screen handling flags."""
+        screen = self.screen
+        if isinstance(screen, TaskScreen):
+            self._handling_task_screen = False
+        elif isinstance(screen, ReviewScreen):
+            self._handling_review_screen = False
+        super().pop_screen()
