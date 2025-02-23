@@ -89,17 +89,40 @@ class ReviewTaskItem(ListItem):
         color: #00dd00;
         text-style: bold;
     }
+    
+    ReviewTaskItem.-reopen {
+        color: #00dd00;
+        text-style: bold;
+    }
+    
+    ReviewTaskItem.-delete {
+        color: #dd0000;
+        text-style: bold;
+    }
     """
     
-    def __init__(self, task: Task, index: int):
+    def __init__(self, task: Task, index: int, decision: 'ReviewDecision'):
         self._task = task
         self._index = index
+        self._decision = decision
         self._label = Label(self.render_text())
         super().__init__(self._label)
+        
+        # Add appropriate CSS class based on decision
+        if decision.value == "reopen":
+            self.add_class("-reopen")
+        elif decision.value == "delete":
+            self.add_class("-delete")
 
     def render_text(self) -> str:
         """Return a text representation of this task."""
-        return f"[R] {self._task.title}"
+        markers = {
+            "keep": "[R]",
+            "reopen": "[+]",
+            "delete": "[D]"
+        }
+        marker = markers[self._decision.value]
+        return f"{marker} {self._task.title}"
 
     @property
     def task(self) -> Task:
