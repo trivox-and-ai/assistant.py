@@ -21,7 +21,7 @@ from .persistence import (
 )
 from .textual_widgets import TaskItem, HelpPanel
 from .task_screen import TaskScreen, TaskScreenResult, TaskScreenComplete
-from .review_screen import ReviewScreen
+from .review_screen import ReviewScreen, ReviewDecision
 
 class TodoApp(App):
     """Main TUI Application."""
@@ -339,3 +339,35 @@ class TodoApp(App):
         elif isinstance(screen, ReviewScreen):
             self._handling_review_screen = False
         super().pop_screen()
+
+    async def on_todo_app_screen_handling_state(self, message: "TodoApp.ScreenHandlingState") -> None:
+        """Handle screen state changes."""
+        self.logger.debug(f"Before state change: handling_review={self._handling_review_screen}, handling_task={self._handling_task_screen}")
+        if message.screen_type == "task":
+            self._handling_task_screen = message.is_handling
+        elif message.screen_type == "review":
+            self._handling_review_screen = message.is_handling
+        self.logger.debug(f"After state change: screen_type={message.screen_type}, is_handling={message.is_handling}, handling_review={self._handling_review_screen}, handling_task={self._handling_task_screen}")
+
+    async def on_review_screen_review_complete(self, message: ReviewScreen.ReviewComplete) -> None:
+        """Handle the completion of review with decisions."""
+        for task, decision in message.decisions.items():
+            if decision == ReviewDecision.DELETE:
+                # Remove task from list
+                self.tasks.remove(task)
+                self.add_log_entry(f"Deleted task: '{task.title}'")
+            elif decision == ReviewDecision.REOPEN:
+                # Unresolve and move to top
+                task.resolved = False
+                self.tasks.remove(task)
+                self.tasks.insert(0, task)
+                self.add_log_entry(f"Reopened task: '{task.title}'")
+            # KEEP decision requires no action
+        
+        save_tasks(self.tasks)
+        await self.update_list_view()
+        
+        # Focus first item if any tasks remain
+        if self.tasks and self.list_view:
+            self.post_message(self.MoveCursor(0))
+

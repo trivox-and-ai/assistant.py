@@ -57,7 +57,14 @@ class ReviewScreen(Screen):
     async def on_key(self, event: events.Key) -> None:
         """Handle key events for the review screen."""
         
-        if event.key in ("j"):
+        if event.key == "R":
+            # First prevent the event from propagating
+            event.stop()
+            event.prevent_default()
+            # Then handle the action
+            self.action_apply()
+            return True
+        elif event.key in ("j"):
             if self.list_view:
                 self.list_view.index = (
                     min(self.list_view.index + 1, len(self.tasks) - 1) 
@@ -136,4 +143,17 @@ class ReviewScreen(Screen):
 
     def action_cancel(self) -> None:
         """Handle Escape key to exit review mode."""
+        self.app.pop_screen()
+
+    class ReviewComplete(events.Message):
+        """Message containing the review results."""
+        def __init__(self, decisions: dict[Task, ReviewDecision]) -> None:
+            super().__init__()
+            self.decisions = decisions
+
+    def action_apply(self) -> None:
+        """Apply all review decisions and exit review mode."""
+        # First post the review complete message
+        self.post_message(self.ReviewComplete(self.decisions))
+        # Then post a message to update the handling state before popping the screen
         self.app.pop_screen()
