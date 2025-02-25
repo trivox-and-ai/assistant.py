@@ -173,7 +173,7 @@ class TodoApp(App):
         elif event.key == "L":
             self.action_toggle_log()
             return
-        elif event.key == "q":
+        elif event.key in ("q", "escape"):
             self.exit()
             return
         elif event.key == "R":

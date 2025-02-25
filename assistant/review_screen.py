@@ -24,10 +24,6 @@ class ReviewScreen(Screen):
     }
     """
     
-    BINDINGS = [
-        ("escape", "cancel", "Exit review mode"),
-    ]
-
     def __init__(self, tasks: List[Task]):
         super().__init__()
         self.tasks = [task for task in tasks if task.resolved]
@@ -68,6 +64,11 @@ class ReviewScreen(Screen):
             event.prevent_default()
             self.action_apply()
             return True
+        elif event.key in ("q", "escape"):
+            event.stop()
+            event.prevent_default()
+            self.action_cancel()
+            return True
         elif event.key in ("j"):
             if self.list_view:
                 self.list_view.index = (
@@ -84,8 +85,6 @@ class ReviewScreen(Screen):
                     else 0
                 )
                 self.list_view.focus()
-        elif event.key == "escape":
-            self.action_cancel()
         elif event.key == "space":
             self.action_toggle_reopen()
         elif event.key == "d":
