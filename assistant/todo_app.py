@@ -2,6 +2,7 @@
 
 import sys
 import logging
+import datetime
 from typing import Optional
 
 from textual.app import App, ComposeResult
@@ -81,7 +82,8 @@ class TodoApp(App):
         self._handling_review_screen = False
 
     def compose(self) -> ComposeResult:
-        yield Label("Alex Assistant - Main Menu", id="header")
+        current_date = datetime.datetime.now().strftime("%d.%m.%Y")
+        yield Label(f"Alex Assistant - Main Menu ({current_date})", id="header")
         with Container():
             yield ListView()  # Don't assign to self.list_view here
 
