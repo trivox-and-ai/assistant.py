@@ -6,7 +6,7 @@ from typing import Optional
 
 from textual.app import App, ComposeResult
 from textual.screen import Screen
-from textual.widgets import ListView, RichLog
+from textual.widgets import ListView, RichLog, Label
 from textual.containers import Container
 from textual.reactive import reactive
 from textual import events
@@ -34,6 +34,16 @@ class TodoApp(App):
     ListView {
         width: 100%;
         height: 100%;
+    }
+
+    #header {
+        dock: top;
+        background: black;
+        color: #00dd00;
+        text-style: bold;
+        padding: 0 1 1 1;
+        width: 100%;
+        height: 2;
     }
     """
 
@@ -71,6 +81,7 @@ class TodoApp(App):
         self._handling_review_screen = False
 
     def compose(self) -> ComposeResult:
+        yield Label("Alex Assistant - Main Menu", id="header")
         with Container():
             yield ListView()  # Don't assign to self.list_view here
 

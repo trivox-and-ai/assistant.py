@@ -1,5 +1,5 @@
 from textual.screen import Screen
-from textual.widgets import ListView
+from textual.widgets import ListView, Label
 from textual import events
 import logging
 from typing import List
@@ -22,6 +22,16 @@ class ReviewScreen(Screen):
         width: 100%;
         height: 100%;
     }
+
+    #header {
+        dock: top;
+        background: black;
+        color: #00dd00;
+        text-style: bold;
+        padding: 0 1 1 1;
+        width: 100%;
+        height: 2;
+    }
     """
     
     def __init__(self, tasks: List[Task]):
@@ -32,6 +42,7 @@ class ReviewScreen(Screen):
         self.logger = logging.getLogger(__name__)
 
     def compose(self):
+        yield Label("Task Review", id="header")
         yield self.list_view
 
     def on_mount(self):
