@@ -60,29 +60,6 @@ class TaskItem(ListItem):
             self.remove_class("-resolved")
 
 
-class HelpPanel(Static):
-    """Shows the help (available commands)."""
-    def compose(self) -> ComposeResult:
-        lines = [
-            "Commands:",
-            "  j / ↓ : Move selection down",
-            "  k / ↑ : Move selection up",
-            "  J: Move selected task DOWN in priority",
-            "  K: Move selected task UP in priority",
-            "  a: Add new task ABOVE selected",
-            "  A: Add new task BELOW selected",
-            "  d: Delete selected task",
-            "  r: Resolve/Unresolve selected task",
-            "  e: Edit selected task (focus Title first)",
-            "  E: Edit selected task (focus Description first)",
-            "  h: Toggle this help panel",
-            "  L: Toggle action log panel",
-            "  q: Quit",
-        ]
-        help_text = "\n".join(lines)
-        yield Label(help_text)
-
-
 class ReviewTaskItem(ListItem):
     """A ListItem representing a task in review mode."""
     

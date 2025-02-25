@@ -19,7 +19,7 @@ from .persistence import (
     save_logs,
     log_action
 )
-from .textual_widgets import TaskItem, HelpPanel
+from .textual_widgets import TaskItem
 from .task_screen import TaskScreen, TaskScreenResult, TaskScreenComplete
 from .review_screen import ReviewScreen, ReviewDecision
 
@@ -46,7 +46,6 @@ class TodoApp(App):
         "add_task": TaskScreen,
     }
 
-    help_panel: Optional[HelpPanel] = None
     log_panel: Optional[RichLog] = None
     list_view: Optional[ListView] = None
 
@@ -98,20 +97,6 @@ class TodoApp(App):
         self.list_view.refresh()
         self.list_view.focus()
 
-    def action_show_help(self):
-        """Toggle help panel (h)."""
-        if self.help_panel:
-            self.help_panel.display = not self.help_panel.display
-
-    def action_toggle_log(self):
-        """Toggle the log panel (L)."""
-        if self.log_panel:
-            self.log_panel.display = not self.log_panel.display
-
-    def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
-        """Fired when user moves selection up/down in the list."""
-        pass
-
     def get_selected_index(self) -> int:
         """Return the currently selected task index or -1 if none."""
         if self.list_view is None or self.list_view.index is None:
@@ -154,9 +139,6 @@ class TodoApp(App):
             return
         elif event.key == "r":
             await self.resolve_or_unresolve_task()
-            return
-        elif event.key == "h":
-            self.action_show_help()
             return
         elif event.key in ("e", "o", "enter"):
             selected_index = self.get_selected_index()
