@@ -219,8 +219,6 @@ class TodoApp(App):
 
     async def on_task_screen_result(self, message: TaskScreenResult) -> None:
         """Handle the result from TaskScreen."""
-        
-        # Skip handling if we're in review mode
         if self._handling_review_screen:
             return
 
@@ -233,12 +231,17 @@ class TodoApp(App):
             if self._editing_task:  # editing existing
                 self._editing_task.title = message.title
                 self._editing_task.description = message.description
+                self._editing_task.future_date = message.future_date
                 task_title = self._editing_task.title
                 target_index = selected_index
                 self._editing_task = None
                 action = "Edited"
             else:
-                new_task = Task(title=message.title, description=message.description)
+                new_task = Task(
+                    title=message.title, 
+                    description=message.description,
+                    future_date=message.future_date
+                )
                 if self._insert_above and selected_index >= 0:
                     self.tasks.insert(selected_index, new_task)
                     target_index = selected_index

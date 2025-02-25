@@ -2,6 +2,7 @@
 
 import logging
 from typing import Optional
+from datetime import datetime, date
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.widgets import Label, Input
@@ -11,11 +12,12 @@ from .data_model import Task
 
 class TaskScreenResult(events.Message):
     """Message containing the result of TaskScreen operations."""
-    def __init__(self, cancelled: bool, title: str = "", description: str = "") -> None:
+    def __init__(self, cancelled: bool, title: str = "", description: str = "", future_date: Optional[date] = None) -> None:
         super().__init__()
         self.cancelled = cancelled
         self.title = title
         self.description = description
+        self.future_date = future_date
 
 class TaskScreenComplete(events.Message):
     """Message indicating that task screen processing is complete."""
@@ -42,10 +44,16 @@ class TaskScreen(Screen):
             placeholder="Description (optional)",
             select_on_focus=False
         )
+        self.date_input = Input(
+            placeholder="Future date (DD.MM.YYYY, optional)",
+            select_on_focus=False
+        )
 
         if task:
             self.title_input.value = task.title
             self.desc_input.value = task.description
+            if task.future_date:
+                self.date_input.value = task.future_date.strftime("%d.%m.%Y")
 
         self.logger = logging.getLogger(__name__)
 
@@ -62,6 +70,8 @@ class TaskScreen(Screen):
         yield self.title_input
         yield Label("Description:")
         yield self.desc_input
+        yield Label("Future date (optional):")
+        yield self.date_input
 
     async def on_key(self, event: events.Key) -> None:
         """Handle key events for the task screen."""
@@ -76,15 +86,26 @@ class TaskScreen(Screen):
         """Handle Enter key for saving the task."""
         title = self.title_input.value.strip()
         description = self.desc_input.value.strip()
+        date_str = self.date_input.value.strip()
 
         if not title:
             self.logger.debug("Title is required, submission aborted")
             return  # Title is required
 
+        future_date = None
+        if date_str:
+            try:
+                future_date = datetime.strptime(date_str, "%d.%m.%Y").date()
+                self.logger.debug(f"Parsed future date: {future_date}")
+            except ValueError:
+                self.logger.debug(f"Invalid date format: {date_str}")
+                # Continue without the date if it's invalid
+
         result = TaskScreenResult(
             cancelled=False,
             title=title,
-            description=description
+            description=description,
+            future_date=future_date
         )
         
         # If we have a parent screen, post directly to it
