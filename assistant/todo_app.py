@@ -223,6 +223,12 @@ class TodoApp(App):
         await self.push_screen(screen)
 
     async def on_task_screen_result(self, message: TaskScreenResult) -> None:
+        """Handle the result from TaskScreen."""
+        
+        # Skip handling if we're in review mode
+        if self._handling_review_screen:
+            return
+
         try:
             if message.cancelled:
                 self._editing_task = None
@@ -332,12 +338,14 @@ class TodoApp(App):
         await super().push_screen(screen, *args, **kwargs)
 
     def pop_screen(self) -> None:
-        """Override pop_screen to reset screen handling flags."""
+        """Override pop_screen to reset screen handling flags and refresh view if needed."""
         screen = self.screen
         if isinstance(screen, TaskScreen):
             self._handling_task_screen = False
         elif isinstance(screen, ReviewScreen):
             self._handling_review_screen = False
+            # Refresh the entire list view when returning from review mode
+            self.call_after_refresh(self.update_list_view)
         super().pop_screen()
 
     async def on_todo_app_screen_handling_state(self, message: "TodoApp.ScreenHandlingState") -> None:

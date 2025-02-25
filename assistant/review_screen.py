@@ -7,6 +7,7 @@ from enum import Enum
 
 from .data_model import Task
 from .textual_widgets import ReviewTaskItem
+from .task_screen import TaskScreen, TaskScreenResult
 
 class ReviewDecision(Enum):
     KEEP = "keep"      # [R] - default state
@@ -56,12 +57,15 @@ class ReviewScreen(Screen):
 
     async def on_key(self, event: events.Key) -> None:
         """Handle key events for the review screen."""
-        
-        if event.key == "R":
-            # First prevent the event from propagating
+        if event.key in ("e", "o", "enter"):
+            await self.open_task_screen(focus_description=False)
+            return True
+        elif event.key == "E":
+            await self.open_task_screen(focus_description=True)
+            return True
+        elif event.key == "R":
             event.stop()
             event.prevent_default()
-            # Then handle the action
             self.action_apply()
             return True
         elif event.key in ("j"):
@@ -110,7 +114,7 @@ class ReviewScreen(Screen):
         # Get existing item and update it in place
         existing_item = self.list_view.children[index]
         if isinstance(existing_item, ReviewTaskItem):
-            existing_item.update_decision(decision)
+            existing_item.update_content(task=task, decision=decision)
         
         # Also post message to ensure consistent state
         self.post_message(self.MoveCursor(index))
@@ -157,3 +161,28 @@ class ReviewScreen(Screen):
         self.post_message(self.ReviewComplete(self.decisions))
         # Then post a message to update the handling state before popping the screen
         self.app.pop_screen()
+
+    async def open_task_screen(self, focus_description: bool = False):
+        """Open the task screen for editing the selected task."""
+        if self.list_view.index is None:
+            return
+            
+        task = self.tasks[self.list_view.index]
+        screen = TaskScreen(task, focus_description=focus_description, parent_screen=self)
+        await self.app.push_screen(screen)
+
+    async def on_task_screen_result(self, message: TaskScreenResult) -> None:
+        """Handle the result from task screen."""
+        if message.cancelled:
+            return
+            
+        current_index = self.list_view.index
+        if current_index is None or current_index >= len(self.tasks):
+            return
+            
+        task = self.tasks[current_index]
+        # Update task in place
+        task.title = message.title
+        task.description = message.description
+        # Refresh the display
+        self._update_item(current_index)

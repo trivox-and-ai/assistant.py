@@ -28,10 +28,11 @@ class TaskScreen(Screen):
         ("escape", "cancel", "Cancel"),
     ]
 
-    def __init__(self, task: Optional[Task] = None, focus_description: bool = False):
+    def __init__(self, task: Optional[Task] = None, focus_description: bool = False, parent_screen: Optional[Screen] = None):
         super().__init__()
         self._task = task
-        self._focus_description = focus_description  # Which field should get focus
+        self._focus_description = focus_description
+        self._parent_screen = parent_screen  # Store the parent screen reference
 
         self.title_input = Input(
             placeholder="Title (required)",
@@ -65,6 +66,8 @@ class TaskScreen(Screen):
     async def on_key(self, event: events.Key) -> None:
         """Handle key events for the task screen."""
         if event.key == "enter":
+            event.stop()  # Stop event propagation
+            event.prevent_default()  # Prevent default handling
             self.action_submit()
             return True
         return False
@@ -78,15 +81,31 @@ class TaskScreen(Screen):
             self.logger.debug("Title is required, submission aborted")
             return  # Title is required
 
-        self.post_message(TaskScreenResult(
+        result = TaskScreenResult(
             cancelled=False,
             title=title,
             description=description
-        ))
+        )
+        
+        # If we have a parent screen, post directly to it
+        if self._parent_screen:
+            self._parent_screen.post_message(result)
+        else:
+            # Fall back to normal behavior for non-review mode
+            self.post_message(result)
+            
         self.app.pop_screen()
 
     def action_cancel(self) -> None:
         """Handle Escape key for canceling task add/edit."""
         self.logger.debug("Cancel action triggered")
-        self.post_message(TaskScreenResult(cancelled=True))
+        result = TaskScreenResult(cancelled=True)
+        
+        # If we have a parent screen, post directly to it
+        if self._parent_screen:
+            self._parent_screen.post_message(result)
+        else:
+            # Fall back to normal behavior for non-review mode
+            self.post_message(result)
+            
         self.app.pop_screen()

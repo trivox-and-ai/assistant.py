@@ -3,6 +3,8 @@
 from textual.widgets import ListItem, Label, Static
 from textual.containers import Vertical, Horizontal
 from textual.app import ComposeResult
+from typing import Optional
+import logging
 
 from .data_model import Task
 
@@ -107,6 +109,7 @@ class ReviewTaskItem(ListItem):
         self._index = index
         self._decision = decision
         self._label = Label(self.render_text())
+        self.logger = logging.getLogger(__name__)  # Add logger initialization
         super().__init__(self._label)
         
         # Add appropriate CSS class based on decision
@@ -133,18 +136,22 @@ class ReviewTaskItem(ListItem):
     def index(self) -> int:
         return self._index
 
-    def update_decision(self, decision: 'ReviewDecision') -> None:
-        """Update the item's decision state and appearance."""
-        self._decision = decision
+    def update_content(self, task: Optional[Task] = None, decision: Optional['ReviewDecision'] = None) -> None:
+        """Update the item's content and/or decision state."""
+        if task is not None:
+            self._task_item = task
+        if decision is not None:
+            self._decision = decision
         
         # Update the label text
-        self._label.update(self.render_text())
+        new_text = self.render_text()
+        self._label.update(new_text)
         
         # Update CSS classes
         self.remove_class("-reopen")
         self.remove_class("-delete")
         
-        if decision.value == "reopen":
+        if self._decision.value == "reopen":
             self.add_class("-reopen")
-        elif decision.value == "delete":
+        elif self._decision.value == "delete":
             self.add_class("-delete")
