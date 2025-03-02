@@ -26,6 +26,11 @@ class TaskItem(ListItem):
     TaskItem.-resolved > Label {
         color: #666666;
     }
+    
+    TaskItem.-future,
+    TaskItem.-future > Label {
+        color: #0088ff;
+    }
     """
     
     def __init__(self, task: Task, index: int):
@@ -37,6 +42,8 @@ class TaskItem(ListItem):
         super().__init__(self._label)
         if task.resolved:  # Only add class if resolved
             self.add_class("-resolved")
+        elif task.is_future_task():  # Add future class if it's a future task
+            self.add_class("-future")
 
     def render_text(self) -> str:
         """Return a text representation of this task, with a marker if resolved."""
@@ -54,10 +61,16 @@ class TaskItem(ListItem):
     def update_content(self):
         """Update the displayed content if the task changes."""
         self._label.update(self.render_text())
+        
+        # Remove all state classes first
+        self.remove_class("-resolved")
+        self.remove_class("-future")
+        
+        # Add appropriate class based on task state
         if self._task.resolved:
             self.add_class("-resolved")
-        else:
-            self.remove_class("-resolved")
+        elif self._task.is_future_task():
+            self.add_class("-future")
 
 
 class ReviewTaskItem(ListItem):
